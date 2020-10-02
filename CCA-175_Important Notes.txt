@@ -1,0 +1,236 @@
+
+akilesh23
+****SLACK CHATS****
+eiziequeij0oh0CeiD4phievahqu7aez
+
+pyspark --master yarn --conf spark.ui port=12692 #confirm the port#
+
+pyspark --master yarn --conf spark.ui.port=0
+
+("/public/retail_db/order_items")
+
+sqlContext.read.json("/public/retail_db_json/order_items").show()
+
+orders = sc.textFile("/public/retail_db_json/orders")
+orders = sc.textFile("/public/retail_db/orders")
+orderItems = sc.textFile("/public/retail_db/order_items")
+
+products = sc.textFile("/public/retail_db/products")
+***********
+FOR:
+for i in orders.take(100) : print(i)
+***********
+
+***********
+TUPLE:
+orderItemsMap = orderItems.map(lambda oi: (int(oi.split(",")[1]), float(oi.split(",")[4])))
+***********
+
+***********
+FILTER:
+ordersComplete = orders.filter(lambda o: o.split(",")[3] == "COMPLETE")
+ordersComplete = orders.filter(lambda o: o.split(",")[3] == "COMPLETE" or o.split(",")[3] == "CLOSED")
+ordersComplete = orders.filter(lambda o: (o.split(",")[3] == "COMPLETE" or o.split(",")[3] == "CLOSED") and o.split(",")[1][:7] == "2014-01")
+ordersComplete = orders.filter(lambda o: (o.split(",")[3] in ["COMPLETE", "CLOSED"]) and o.split(",")[1][:7] == "2014-01")
+**********
+MAP/JOIN:
+ordersMap = orders.map(lambda o:(int(o.split(",")[0]),o.split(",")[1]))
+orderItemsMap = orderItems.map(lambda oi:(int(oi.split(",")[1]),float(oi.split(",")[4])))
+ordersJoin = ordersMap.join(orderItemsMap)
+ordersLeftOuterJoin = ordersMap.leftOuterJoin(orderItemsMap)
+
+ordersMap = orders.map(lambda o:(int(o.split(",")[0]),o.split(",")[3]))
+orderItemsMap = orderItems.map(lambda oi:(int(oi.split(",")[1]),float(oi.split(",")[4])))
+ordersJoin = ordersMap.join(orderItemsMap)
+
+ordersLeftOuterJoin = ordersMap.leftOuterJoin(orderItemsMap)
+ordersLeftOuterJoinFilter = ordersLeftOuterJoin.filter(lambda o: o[1][1] == None)
+
+ordersRightOuterJoin = orderItemsMap.rightOuterJoin(ordersMap)
+ordersRightOuterJoinFilter = ordersRightOuterJoin.filter(lambda o: o[1][0] == None)
+**********
+AGGREGATION:
+
+orderItemsFiltered = orderItems.filter(lambda oi: int(oi.split(",")[1]) == 2)
+orderItemsSubTotals = orderItemsFiltered.map(lambda oi: float(oi.split(",")[4]))
+
+REDUCE:
+from operator import add
+orderItemsSubTotals.reduce(add) 
+####(OR)####
+orderItemsSubTotals.reduce(lambda x,y: x+y)
+
+orderItemsFiltered.reduce(lambda x,y: x if(float(x.split(",")[4]) < float(y.split(",")[4])) else y)
+
+#float(x.split(",")[4]))
+*********************
+COUNTBY:
+orderStatus = orders.map(lambda o: (o.split(",")[3],1))
+countByStatus = orderStatus.countByKey()
+
+GROUPBY:
+orderItemsGroupByOrderId = orderItemsMap.groupByKey()
+revenuePerOrderId = orderItemsGroupByOrderId.map(lambda oi: (oi[0],round(sum(oi[1]),2)))
+
+orderItemsMap = orderItems.map(lambda oi:(int(oi.split(",")[1]),oi))
+orderItemsGroupByOrderId = orderItemsMap.groupByKey()
+
+orderItemsSortedBySubtotalPerOrder = orderItemsGroupByOrderId.map(lambda oi: sorted(oi[1], key=lambda k: float(k.split(",")[4]),reverse=True))
+
+#FLATMAP:
+orderItemsSortedBySubtotalPerOrder = orderItemsGroupByOrderId.flatMap(lambda oi: sorted(oi[1], key=lambda k: float(k.split(",")[4]),reverse=True))
+
+#REDUCEBYKEY:
+from operator import add
+revenuePerOrderId = orderItemsMap.reduceByKey(add)
+#(OR)
+revenuePerOrderId = orderItemsMap.reduceByKey(lambda x,y: x+y)
+
+minSubtotalPerOrderId = orderItemsMap.reduceByKey(lambda x,y: x if (x<y) else y)
+
+#Get order item details with minimum subtotal for each order_id
+orderItemsMap = orderItems.map(lambda oi:(int(oi.split(",")[1]),oi))
+minSubtotalPerOrderId = orderItemsMap.reduceByKey(lambda x,y: x if (float(x.split(",")[4])<float(y.split(",")[4])) else y)
+
+AGGREGATEBYKEY:
+#GET REVENUE AND COUNT OF ITEMS FOR EACH ORDER ID
+orderItemsMap = orderItems.map(lambda oi:(int(oi.split(",")[1]),float(oi.split(",")[4])))
+revenuePerOrder = orderItemsMap.aggregateByKey((0.0,0), lambda x, y: (x[0] + y, x[1] + 1), lambda x, y: (x[0] + y[0], x[1] + y[1]))
+*********************
+SORTBYKEY:
+productsMap = products.filter(lambda p: p.split(",")[4]!= "").map(lambda p: (float(p.split(",")[4]),p)) #THIS FILTER IS FOR DQ ISSUE
+productsSortedByPrice = productsMap.sortByKey()
+productsSortedMap = productsSortedByPrice.map(lambda p: P[1])
+
+productsMap = products.filter(lambda p: p.split(",")[4]!= "").map(lambda p: ((int(p.split(",")[1]), -float(p.split(",")[4])),p))
+for i in productsMap.sortByKey().map(lambda p: p[1]).take(1000): print(i)
+*********************
+RANKING:
+#GET TOP N PRODUCTS BY PRICE - GLOBAL RANKING - sortByKey & take
+productsMap = products.filter(lambda p: p.split(",")[4]!= "").map(lambda p: (float(p.split(",")[4]),p))
+productsSortedByPrice = productsMap.sortByKey(False)
+for i in productsSortedByPrice.map(lambda p: p[1]).take(5): print(i)
+
+#GET TOP N PRODUCTS BY PRICE - GLOBAL RANKING - top & takeOrdered
+productsFiltered = products.filter(lambda p: p.split(",")[4]!= "")
+
+topNProducts = productsFiltered.top(5, key=lambda k: float(k.split(",")[4]))
+(OR)
+topNProductsUsingTakeOrdered = productsFiltered.takeOrdered(5, key=lambda k: -float(k.split(",")[4]))
+
+#GET TOP N PRODUCTS BY PRICE WITHIN EACH CATEGORY - BY KEY RANKING - groupByKey and flatMap
+productsMap = products.map(lambda p: (int(p.split(",")[1]),p))
+productsGroupByCategoryId = productsMap.groupByKey()
+
+topNProductsByCategory = productsGroupByCategoryId.flatMap(lambda p: sorted(p[1],key=lambda k:float(k.split(",")[4]),reverse=True)[:3])
+
+t = productsGroupByCategoryId.filter(lambda p: p[0] == 59).first()
+
+#69. Ranking - By Key - Get top N priced products - Create Function
+def getTopNPricedProductsPerCategoryId(productsPerCategoryId, topN):
+	productsSorted = sorted(productsPerCategoryId[1], key=lambda k: float(k.split(",")[4]),reverse=True)
+	productPrices = map(lambda p: float(p.split(",")[4]),productsSorted)
+	topNPrices = sorted(set(productPrices), reverse=True)[:topN]
+	import itertools as it
+	return it.takewhile(lambda p: float(p.split(",")[4]) in topNPrices,productsSorted)
+
+list(getTopNPricedProductsPerCategoryId(t,3))
+
+#70. Ranking - By Key - Get top N priced products - integrate with flatMap
+products = sc.textFile("/public/retail_db/products")
+productsFiltered = products. \
+filter(lambda p: p.split(",")[4] != "")
+
+productsMap = productsFiltered. \
+map(lambda p: (int(p.split(",")[1]), p))
+productsGroupByCategoryId = productsMap.groupByKey()
+for i in productsGroupByCategoryId.take(10): print(i)
+
+#JUST FOR TESTING
+t = productsGroupByCategoryId. \
+filter(lambda p: p[0] == 59). \
+first()
+
+def getTopNPricedProductsPerCategoryId(productsPerCategoryId, topN):
+  productsSorted = sorted(productsPerCategoryId[1], 
+                     key=lambda k: float(k.split(",")[4]), 
+                     reverse=True
+                   )
+  productPrices = map(lambda p: float(p.split(",")[4]), productsSorted)
+  topNPrices = sorted(set(productPrices), reverse=True)[:topN]
+  import itertools as it
+  return it.takewhile(lambda p: 
+                        float(p.split(",")[4]) in topNPrices, 
+                        productsSorted
+                      )
+
+list(getTopNPricedProductsPerCategoryId(t, 3))
+
+topNPricedProducts = productsGroupByCategoryId. \
+flatMap(lambda p: getTopNPricedProductsPerCategoryId(p, 3))
+for i in topNPricedProducts.collect(): print(i)
+
+****************************************************
+#72. Set Operations - Prepare data - SUBSETS OF PRODUCTS FOR 2013-12 AND 2014-01
+orders = sc.textFile("/public/retail_db/orders")
+orderItems = sc.textFile("/public/retail_db/order_items")
+
+orders201312 = orders.filter(lambda o: o.split(",")[1][:7] == "2013-12").map(lambda o: (int(o.split(",")[0]),o))
+orders201401 = orders.filter(lambda o: o.split(",")[1][:7] == "2014-01").map(lambda o: (int(o.split(",")[0]),o))
+orderItemsMap = orderItems.map(lambda oi: (int(oi.split(",")[1]),oi))
+#JOIN
+orderItems201312 = orders201312.join(orderItemsMap).map(lambda oi: oi[1][1])
+orderItems201401 = orders201401.join(orderItemsMap).map(lambda oi: oi[1][1])
+
+#UNION
+products201312 = orderItems201312.map(lambda p: int(p.split(",")[2]))
+products201401 = orderItems201401.map(lambda p: int(p.split(",")[2]))
+allProducts = products201312.union(products201401)
+
+#DISTINCT
+allProducts = products201312.union(products201401).distinct()
+
+#INTERSECTION
+commonProducts = products201312.intersection(products201401)
+
+#SET OPERATIONS - MINUS - GET PRODUCT IDS SOLD IN 2013-12 BUT NOT IN 2014-01
+products201312Only = products201312.subtract(products201401).distinct()
+products201401Only = products201401.subtract(products201312).distinct()
+productsSoldOnlyInOneMonth = products201312Only.union(products201401Only)
+
+****************************************************
+#SaveAsTextFile
+orderItems = sc.textFile("/public/retail_db/order_items")
+orderItemsMap = orderItems.map(lambda oi: (int(oi.split(",")[1]),float(oi.split(",")[4])))
+from operator import add
+revenuePerOrderId = orderItemsMap.reduceByKey(add).map(lambda r: str(r[0]) + "\t" + str(r[1]))
+revenuePerOrderId.saveAsTextFile("/user/akilesh23/revenue_per_order_id")
+for i in sc.textFile("/user/akilesh23/revenue_per_order_id").take(100): print(i)
+
+#COMPRESSION
+revenuePerOrderId.saveAsTextFile("/user/akilesh23/revenue_per_order_compressed", compressionCodecClass="org.apache.hadoop.io.compress.SnappyCodec")
+for i in sc.textFile("/user/akilesh23/revenue_per_order_compressed").take(100): print(i)
+
+#SAVE AS JSON
+orderItems = sc.textFile("/public/retail_db/order_items")
+orderItemsMap = orderItems.map(lambda oi: (int(oi.split(",")[1]),float(oi.split(",")[4])))
+from operator import add
+revenuePerOrderId = orderItemsMap.reduceByKey(add).map(lambda r: (r[0],round(r[1],2)))
+#CONVERT TO DF
+revenuePerOrderIdDF = revenuePerOrderId.toDF(schema=["order_id","order_revenue"]).show()
+
+#SaveAsJson
+revenuePerOrderIdDF = revenuePerOrderId.toDF(schema=["order_id","order_revenue"])
+
+revenuePerOrderIdDF.save("/user/akilesh23/revenue_per_order_json", "json")
+(OR)
+revenuePerOrderIdDF.write.json("/user/akilesh23/revenue_per_order_json")
+
+#Read Data from Json
+sqlContext.read.json("/user/akilesh23/revenue_per_order_json").show()
+
+
+
+
+
+

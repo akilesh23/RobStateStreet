@@ -1,0 +1,20 @@
+SELECT TABLE1.A.ClassDate, TABLE1.Present, TABLE2.Total, (TABLE1.Present/TABLE2.Total * 100) AS AttendancePercentage FROM 
+(
+SELECT A.ClassDate, COUNT(A.Present) AS Present FROM (Students S 
+INNER JOIN Attendance A ON A.StudentId = S.StudentId) 
+INNER JOIN Sections Sec ON Sec.SectionId = A.SectionId
+WHERE ((A.ClassDate BETWEEN #11/23/2015# AND #12/12/2015#) AND A.Present = True AND A.SectionId = (Select SectionId FROM Sections WHERE SectionName = 'Automobile-F.N.'))
+GROUP BY A.ClassDate
+)  AS TABLE1 
+
+INNER JOIN 
+
+(
+SELECT A.ClassDate, COUNT(S.StudentId) AS Total FROM (Students S 
+INNER JOIN Attendance A ON A.StudentId = S.StudentId) 
+INNER JOIN Sections Sec ON Sec.SectionId = A.SectionId
+WHERE ((A.ClassDate BETWEEN #11/23/2015# AND #12/12/2015#) AND A.SectionId = (Select SectionId FROM Sections WHERE SectionName = 'Automobile-F.N.'))
+GROUP BY A.ClassDate
+)  AS TABLE2 
+
+ON TABLE1.A.ClassDate = TABLE2.A.ClassDate;

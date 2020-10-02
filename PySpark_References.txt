@@ -1,0 +1,50 @@
+from pyspark.sql import Row
+from pyspark.sql.types import StructField, StructType, StringType, LongType
+
+df = spark.read.csv("FILE.csv", inferschema=True, header=True)
+
+#CREATE TEMP VIEW FROM DATAFRAME
+df.createOrReplaceTempView("df_table")
+
+#SQL FUNCTIONS
+import pyspark.sql.functions as F
+
+df.select("country").show(1) [OR] df.select(F.col("country")).show(1)
+
+df.select(F.expr("COUNTRY AS DESTINATION")).show(1)
+
+df.selectExpr("COUNTRY AS DESTINATION", "COUNTRY") --> COLUMN NAME RENAMED IN 1ST COLUMN; BOTH RESULTS IN SAME ROWS
+
+agg_df = df.selectExpr("avg(counts)", "count(distinct(country))")
+
+#FILTER:
+df.where(F.col("counts") <= 1).where(F.col("country") != "United States").show()
+
+#DISTINCT COUNT
+df.select("CITY").distinct().count()
+
+#SORTING
+df3.orderBy(F.desc("counts")).show()
+
+#LIMIT
+df.limit(3).show()
+df.head(3)
+df.tail(3)
+
+
+#ALIAS
+emp_json_df.select(emp_json_df.age.alias('emp age'),emp_json_df.name,(emp_json_salary * 1.05).alias("rev_sal")).show()
+
+#NEW COLUMN
+emp_json_df.withColumn('new_sal', emp_json_df['salary']*1.05).show()
+
+---------------
+#TO USE SQL STMTS
+
+#CREATE TEMP VIEW FROM DATAFRAME
+emp_json_df.createOrReplaceTempView("emp_view")
+sql_df = spark.sql("select * from emp_view")
+sql_df.show()
+
+#FILTER:
+fifa_df.filter((fifa_df.MatchId == '104') & fifa_df.eventId == 'GK10').show()
